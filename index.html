@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebSocket Filesystem</title>
+  </head>
+  <body>
+    <script>
+    const S_IFDIR = 16384;
+    const S_IFLNK = 40960;
+    const S_IFREG = 32768;
+
+    function printLine(data) {
+      let messages = document.getElementsByTagName('ul')[0];
+      let message = document.createElement('li');
+      let content = document.createTextNode(event.data);
+
+      message.appendChild(content);
+      messages.appendChild(message);
+    }
+
+    function now() {
+      return Math.floor(new Date() / 1000);
+    }
+
+    let files = {};
+
+    files['/'] = {
+      st_mode: S_IFDIR | 0o755,
+      st_ctime: now(),
+      st_mtime: now(),
+      st_atime: now(),
+      st_nlink: 2 // directories have 2 hard links
+    };
+
+    function handleEvent(event) {
+      message = JSON.parse(event.data)
+      switch(message.command) {
+        case 'getattr':
+          return files[event.path];
+        default:
+          console.log(event);
+      }
+    }
+
+    let ws = new WebSocket("ws://127.0.0.1:9000/ws");
+    let messages = document.createElement('ul');
+
+    ws.onmessage = function (event) {
+      printLine(event);
+      handleEvent(event);
+    }
+
+    document.body.appendChild(messages);
+    </script>
+  </body>
+</html>

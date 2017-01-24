@@ -1,0 +1,23 @@
+{
+    "_meta": {
+        "sources": [
+            {
+                "url": "https://pypi.org/",
+                "verify_ssl": true
+            }
+        ],
+        "requires": {},
+        "Pipfile-sha256": "9e8ac68f8691e5e2cf14beab464a15a0ddf4c296b34ec81b52eb5dd34e68e587"
+    },
+    "default": {
+        "six": "==1.10.0",
+        "packaging": "==16.8",
+        "appdirs": "==1.4.0",
+        "asyncio": "==3.4.3",
+        "fusepy": "==2.0.4",
+        "cherrypy": "==8.9.1",
+        "ws4py": "==0.3.5",
+        "pyparsing": "==2.1.10"
+    },
+    "develop": {}
+}

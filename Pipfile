@@ -1,0 +1,12 @@
+[[source]]
+url = "https://pypi.org/"
+verify_ssl = true
+
+[packages]
+six = "*"
+packaging = "*"
+appdirs = "*"
+asyncio = "*"
+fusepy = "*"
+cherrypy = "==8.9.1"
+ws4py = "*"
