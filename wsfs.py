@@ -9,8 +9,10 @@ import time
 import json
 
 from collections import deque
+from queue import Queue
 
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from errno import ENOENT
 
 import cherrypy
 from ws4py.websocket import WebSocket
@@ -20,16 +22,7 @@ import threading
 
 COMMAND_TYPE = 'command'
 
-
-class WSFSWebSocket(WebSocket):
-  def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
-    super().__init__(sock, protocols=protocols, extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
-    self.queue = deque()
-
-  def received_message(self, message):
-    self.queue.append(
-      json.loads(message)
-    )
+websocket_queue = Queue()
 
 class WebSocketFilesystem(LoggingMixIn, Operations):
   def __init__(self):
@@ -45,7 +38,8 @@ class WebSocketFilesystem(LoggingMixIn, Operations):
 
       @cherrypy.expose
       def index(self):
-        return 'some HTML with a websocket javascript connection'
+        with open('index.html', 'r') as index_file:
+          return index_file.read()
 
       @cherrypy.expose
       def ws(self):
@@ -53,11 +47,22 @@ class WebSocketFilesystem(LoggingMixIn, Operations):
         self.wsfs.ws = cherrypy.request.ws_handler
         self.wsfs.ready = True
 
-    def start_server():
+    def start_server(q):
+      class WSFSWebSocket(WebSocket):
+        def __init__(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
+          super().__init__(sock, protocols=protocols, extensions=extensions, environ=environ, heartbeat_freq=heartbeat_freq)
+          self.queue = q
+
+        def received_message(self, message):
+          print(message.data)
+          self.queue.put(
+            json.loads(message.data)
+          )
+
       cherrypy.quickstart(Root(self), '/', config={'/ws': {'tools.websocket.on': True,
                                                      'tools.websocket.handler_cls': WSFSWebSocket}})
 
-    threading.Thread(target=start_server).start()
+    threading.Thread(target=start_server, args=(websocket_queue,)).start()
 
     print('waiting for ws connection')
 
@@ -68,19 +73,18 @@ class WebSocketFilesystem(LoggingMixIn, Operations):
     print('started')
 
   def receive(self, command):
-    timeout_start = time.time()
-    while len(self.ws.queue) == 0 or time.time() > timeout_start + 1:
-      time.sleep(0.01)
-
-    response = self.ws.queue.popleft()
+    response = websocket_queue.get(True, 5)
 
     if response[COMMAND_TYPE] == command:
-      return response
+      websocket_queue.task_done()
+      return response['data']
     else:
       print('oh no: ' + response[COMMAND_TYPE])
 
   def send(self, data):
-    self.ws.send(json.dumps(data))
+    string = json.dumps(data)
+    print(string)
+    self.ws.send(string)
 
   # def access(self, path, mode):
   #   full_path = self._full_path(path)
@@ -113,6 +117,9 @@ class WebSocketFilesystem(LoggingMixIn, Operations):
 
     attrs = self.receive('getattr')
 
+    if attrs == '':
+      raise FuseOSError(ENOENT)
+
     return attrs
 
   def readdir(self, path, fh):
@@ -123,7 +130,7 @@ class WebSocketFilesystem(LoggingMixIn, Operations):
 
     dir_files = self.receive('readdir')
 
-    return ['.', '..'] + dir_files['files']
+    return dir_files
 
   def readlink(self, path):
     self.send(dict(

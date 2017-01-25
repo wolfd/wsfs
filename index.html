@@ -32,13 +32,16 @@
       st_nlink: 2 // directories have 2 hard links
     };
 
-    function handleEvent(event) {
-      message = JSON.parse(event.data)
+    function handleEvent(message) {
       switch(message.command) {
         case 'getattr':
-          return files[event.path];
+          return files[message.path] || '';
+        case 'readdir':
+          let fileList = Object.keys(files);
+          return ['.', '..'].concat(fileList);
         default:
-          console.log(event);
+          console.log(message);
+          return {};
       }
     }
 
@@ -47,7 +50,17 @@
 
     ws.onmessage = function (event) {
       printLine(event);
-      handleEvent(event);
+
+      message = JSON.parse(event.data)
+
+      let result = handleEvent(message);
+
+      let wrappedResult = {
+        command: message.command,
+        data: result
+      };
+
+      ws.send(JSON.stringify(wrappedResult));
     }
 
     document.body.appendChild(messages);
